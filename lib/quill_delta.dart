@@ -50,6 +50,7 @@ class Operation {
         assert(() {
           if (key != Operation.insertKey) return true;
           return data.length == length;
+          return true;
         }(), 'Length of insert operation must be equal to the text length.'),
         _attributes = attributes != null
             ? new Map<String, dynamic>.from(attributes)
@@ -59,9 +60,24 @@ class Operation {
   static Operation fromJson(data) {
     final map = new Map<String, dynamic>.from(data);
     if (map.containsKey(Operation.insertKey)) {
-      final String text = map[Operation.insertKey];
-      return new Operation._(
-          Operation.insertKey, text.length, text, map[Operation.attributesKey]);
+      final v = map[Operation.insertKey];
+      if(v is String){
+        final String text = v;
+        return new Operation._(
+            Operation.insertKey, text.length, text, map[Operation.attributesKey]);
+      }
+      else{
+        final embed = v as Map;
+        if(embed.containsKey("image")){
+          final String text= String.fromCharCode(0x200b) + "\n";
+          final attributes = map[Operation.attributesKey] as Map ?? {};
+          attributes["embed"] = {
+            "type": "image","source": embed["image"] as String
+          };
+          return new Operation._(
+              Operation.insertKey, text.length, text, attributes);
+        }
+      }
     } else if (map.containsKey(Operation.deleteKey)) {
       final int length = map[Operation.deleteKey];
       return new Operation._(Operation.deleteKey, length, '', null);
@@ -76,7 +92,24 @@ class Operation {
   /// Returns JSON-serializable representation of this operation.
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> json = {key: value};
-    if (_attributes != null) json[Operation.attributesKey] = attributes;
+    if(_attributes != null && attributes.containsKey("embed")){
+      final embed = attributes["embed"];
+      final embedType = embed["type"];
+      assert(embedType == "image");
+      json[key] = {
+        embedType: embed["source"],
+      };
+      final attri = Map.from(attributes);
+      attri.remove("embed");
+      if(attri.isNotEmpty){
+        json[Operation.attributesKey] = attri;
+      }
+
+    }
+    else{
+      if (_attributes != null) json[Operation.attributesKey] = attributes;
+    }
+
     return json;
   }
 
